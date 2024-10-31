@@ -1,5 +1,6 @@
 // Import data like books, authors, genres, and a constant for books per page
 import { books, authors, genres, BOOKS_PER_PAGE } from './data.js';
+import './BookPreview.js';
 
 // Create a class for handling the book list
 class BookList {
@@ -27,19 +28,14 @@ class BookList {
         document.querySelector('[data-list-items]').appendChild(starting); // Add fragment to the DOM
     }
 
-    // Create individual book preview element
+    // Modified createBookPreview to use the Web Component
     createBookPreview({ author, id, image, title }) {
-        const element = document.createElement('button'); // Create button for preview
-        element.classList.add('preview'); // Add 'preview' class
-        element.setAttribute('data-preview', id); // Add book ID for data-attribute
-        element.innerHTML = ` // Set up preview structure with image, title, and author name
-            <img class="preview__image" src="${image}" />
-            <div class="preview__info">
-                <h3 class="preview__title">${title}</h3>
-                <div class="preview__author">${authors[author]}</div>
-            </div>
-        `;
-        return element; // Return constructed preview element
+        const element = document.createElement('book-preview');
+        element.setAttribute('title', title);
+        element.setAttribute('author', authors[author]);
+        element.setAttribute('image', image);
+        element.setAttribute('id', id);
+        return element;
     }
 
     // Renders genre options for filtering books
@@ -178,35 +174,42 @@ class BookList {
         `; // Update button text with remaining count
     }
 
-    // Load more books into the list
+    // Load more books on clicking "Show More"
     loadMoreBooks() {
+        this.page += 1; // Increment page
         const fragment = document.createDocumentFragment(); // Create fragment for efficiency
-        const nextBooks = this.matches.slice(this.page * BOOKS_PER_PAGE, (this.page + 1) * BOOKS_PER_PAGE); // Slice next set of books
-        nextBooks.map(this.createBookPreview.bind(this)).forEach(element => fragment.appendChild(element)); // Append to fragment
+        const bookPreviews = this.matches.slice((this.page - 1) * BOOKS_PER_PAGE, this.page * BOOKS_PER_PAGE).map(this.createBookPreview.bind(this)); // Slice next page of books
+        bookPreviews.forEach(element => fragment.appendChild(element)); // Append previews to fragment
         document.querySelector('[data-list-items]').appendChild(fragment); // Add to DOM
-        this.page += 1; // Increment page count
-        this.updateShowMoreButton(); // Update "Show More" button
+        this.updateShowMoreButton(); // Update button
     }
 
-    // Show detailed information about a selected book
+    // Show book details in overlay on click
     showBookDetails(event) {
-        const pathArray = Array.from(event.path || event.composedPath()); // Get event path
-        const activeBook = pathArray.find(node => node?.dataset?.preview); // Find clicked preview button
+        const pathArray = event.composedPath ? event.composedPath() : []; // Use composedPath
+        let active = null;
 
-        if (activeBook) { // If preview found, get book details
-            const bookId = activeBook.dataset.preview; // Get book ID
-            const active = books.find(book => book.id === bookId); // Find book in data
-            if (active) { // If book found, populate details
-                document.querySelector('[data-list-active]').open = true; // Open details overlay
-                document.querySelector('[data-list-blur]').src = active.image; // Set background image
-                document.querySelector('[data-list-image]').src = active.image; // Set book image
-                document.querySelector('[data-list-title]').innerText = active.title; // Set book title
-                document.querySelector('[data-list-subtitle]').innerText = `${authors[active.author]} (${new Date(active.published).getFullYear()})`; // Set author and year
-                document.querySelector('[data-list-description]').innerText = active.description; // Set description
+        for (const node of pathArray) { // Traverse path to find book element
+            if (active) break;
+            const previewId = node?.dataset?.preview; // Get preview ID from dataset
+            for (const book of this.matches) { // Find matching book
+                if (book.id === previewId) {
+                    active = book;
+                    break;
+                }
             }
+        }
+
+        if (active) {
+            document.querySelector('[data-list-active]').open = true; // Open book detail overlay
+            document.querySelector('[data-list-blur]').src = active.image; // Set image
+            document.querySelector('[data-list-image]').src = active.image; // Set image
+            document.querySelector('[data-list-title]').innerText = active.title; // Set title
+            document.querySelector('[data-list-subtitle]').innerText = `${authors[active.author]} (${new Date(active.published).getFullYear()})`; // Set subtitle with author and year
+            document.querySelector('[data-list-description]').innerText = active.description; // Set description
         }
     }
 }
 
-// Initialize the BookList application
+// Instantiate BookList to initialize the book list app
 new BookList();
